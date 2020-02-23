@@ -9,11 +9,22 @@ let service: FLService;
 app.get("/", async (request, response) => {
 
     // отправляем ответ
-    if(!service){
+    if (!service) {
         service = new FLService();
     }
 
-    const result = await service.getProjects('angular', 'node.js', 'nodejs', 'react');
+    const keywords = request.query['keywords'] as string[];
+    if (!keywords?.length) {
+        response.send('ОШИБКА');
+        return;
+    }
+
+    const result = await service.getProjects({
+        words: keywords,
+        minBudget: request.query['minBudget'],
+        maxBudget: request.query['maxBudget'],
+        withoutContractor: true
+    });
 
     response.send(result);
     // response.send("<h2>Привет Express!</h2>");
