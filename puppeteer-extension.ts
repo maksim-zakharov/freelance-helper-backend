@@ -26,7 +26,7 @@ export const tryNavigate = async (page: Page, pageUrl: string): Promise<void> =>
             return;
         }
 
-        await page.goto(pageUrl, {waitUntil: "domcontentloaded", timeout: 5000}); // При domcontentloaded не дожидаемся загрузки фоток и стилей
+        await page.goto(pageUrl, {waitUntil: "domcontentloaded", timeout: 0}); // При domcontentloaded не дожидаемся загрузки фоток и стилей
     } catch (error) {
         console.log(`${new Date().toLocaleString()}: Не удалось открыть страницу: ${pageUrl} из-за ошибки: ${error}`);
     }

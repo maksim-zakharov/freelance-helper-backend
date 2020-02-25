@@ -25,12 +25,17 @@ app.get("/", async (request, response) => {
 
     let loginPage: Page;
     if (request.query['login'] && request.query['password']) {
-        loginPage = await service.login({login: request.query['login'], password: request.query['password'], isDebug: request.query['isDebug']});
+        loginPage = await service.login({
+            login: request.query['login'],
+            password: request.query['password'],
+            isDebug: request.query['isDebug']
+        });
     }
 
     const result = await service.getProjects({
         page: loginPage,
         words: keywords,
+        isDebug: request.query['isDebug'],
         minBudget: request.query['minBudget'],
         maxBudget: request.query['maxBudget'],
         withoutContractor: true

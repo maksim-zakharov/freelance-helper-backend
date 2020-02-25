@@ -65,19 +65,48 @@ export class FlService {
         return page;
     }
 
+    private _parseProjectsList(page: Page): Promise<any[]> {
+        return page.evaluate(() => {
+            const projects = Array.from(document.querySelectorAll('#projects-list [id^="project-item"]'));
+            const ids = projects.map((e: HTMLElement) => +e.id.replace('project-item', ''));
+            return ids
+                .map(id => ({
+                    id: id,
+                    title: document.querySelector(`#prj_name_${id}`)?.textContent,
+                    createDate: document.querySelector(`#prj_name_${id} > div.b-post__foot.b-post__foot_padtop_15 > div:nth-child(2)`)?.textContent,
+                    views: +document.querySelector(`#project-item${id} > div.b-post__foot.b-post__foot_padtop_15 > div:nth-child(2) > span.b-post__txt.b-post__txt_float_right.b-post__txt_fontsize_11.b-post__txt_bold.b-post__link_margtop_7`)
+                        ?.textContent
+                        .trim()
+                    ,
+                    proposalCount: +document.querySelector(`#project-item${id} > div.b-post__foot.b-post__foot_padtop_15 > div:nth-child(2) > a`)
+                        ?.textContent
+                        .replace(/[^\x20-\x7E]/g, '')
+                        .trim(),
+                    link: `https://www.fl.ru${document.querySelector(`#prj_name_${id}`)?.getAttribute('href')}`,
+                    description: document.querySelector(`#project-item${id} > div.b-post__body.b-post__body_padtop_15.b-post__body_overflow_hidden.b-layuot_width_full > div.b-post__txt`)
+                        ?.textContent
+                        ?.trimLeft()
+                        .trimRight(),
+                    price: +document.querySelector(`#project-item${id} > div.b-post__price.b-layout__txt_right.b-post__price_padleft_10.b-post__price_padbot_5.b-post__price_float_right.b-post__price_fontsize_15.b-post__price_bold`)
+                        ?.textContent
+                        .replace(/[^\x20-\x7E]/g, '')
+                        .trim(),
+                }));
+        });
+    }
+
     /**
      * Возвращает все проекты с сайта https://fl.ru по заданным фильтрам
      * @param search Объект с фильтрами
      */
-    getProjects = async (search: { words: string[], minBudget?: number, maxBudget?: number, withoutContractor?: boolean, page?: Page }) => {
+    getProjects = async (search: { words: string[], minBudget?: number, isDebug?: boolean | string, maxBudget?: number, withoutContractor?: boolean, page?: Page }) => {
         if (!search) {
             throw new Error('Нужно передать параметры для поиска');
         }
 
         let browser: Browser;
         if (!search.page) {
-            // browser = await puppeteer.launch();
-            browser = await puppeteer.launch({headless: false});
+            browser = await puppeteer.launch({headless: search.isDebug != 'true'});
         } else {
             browser = search.page.browser();
         }
@@ -94,7 +123,7 @@ export class FlService {
             await Promise.all(search.words.map(async (word, index) => {
                     // for (let i = 0; i < search.words.length; i++) {
                     //     const word = search.words[i];
-                    const page = index === 0 ? search.page : await browser.newPage();
+                    const page = index === 0 && search.page ? search.page : await browser.newPage();
 
                     if (search.page) {
                         const cookies = await search.page.cookies();
@@ -123,29 +152,28 @@ export class FlService {
                         visible: true
                     });
                     console.log(`${new Date().toLocaleString()}: Пытаемся распарсить список`);
-                    const result = await page.evaluate(() => {
-                        const projects = Array.from(document.querySelectorAll('#projects-list [id^="project-item"]'));
-                        const ids = projects.map((e: HTMLElement) => +e.id.replace('project-item', ''));
-                        return ids
-                            .map(id => ({
-                                id: id,
-                                title: document.querySelector(`#prj_name_${id}`)?.textContent,
-                                createDate: document.querySelector(`#prj_name_${id} > div.b-post__foot.b-post__foot_padtop_15 > div:nth-child(2)`)?.textContent,
-                                views: +document.querySelector(`#project-item${id} > div.b-post__foot.b-post__foot_padtop_15 > div:nth-child(2) > span.b-post__txt.b-post__txt_float_right.b-post__txt_fontsize_11.b-post__txt_bold.b-post__link_margtop_7`)
-                                    ?.textContent
-                                    .trim()
-                                ,
-                                proposalCount: +document.querySelector(`#project-item${id} > div.b-post__foot.b-post__foot_padtop_15 > div:nth-child(2) > a`)
-                                    ?.textContent
-                                    .replace(/[^\x20-\x7E]/g, '').trim(),
-                                link: document.querySelector(`#prj_name_${id}`)?.getAttribute('href'),
-                                description: document.querySelector(`#project-item${id} > div.b-post__body.b-post__body_padtop_15.b-post__body_overflow_hidden.b-layuot_width_full > div.b-post__txt`)?.textContent?.trimLeft().trimRight(),
-                                price: +document.querySelector(`#project-item${id} > div.b-post__price.b-layout__txt_right.b-post__price_padleft_10.b-post__price_padbot_5.b-post__price_float_right.b-post__price_fontsize_15.b-post__price_bold`)?.textContent
-                                    .replace(/[^\x20-\x7E]/g, '').trim(),
-                            }));
-                    });
-                    console.log(`${new Date().toLocaleString()}: Распарсили`);
+
+
+                    let pageCount = 1;
+
+                    let result = await this._parseProjectsList(page);
+                    console.log(`${new Date().toLocaleString()}: Распарсили страницу ${pageCount++}`);
                     projects.push(result);
+
+                    try {
+                        while (await page.waitForSelector('#PrevLink', {timeout: 1000})) {
+                            await page.click('#PrevLink');
+                            await page.waitForSelector('#projects-list [id^="project-item"]', {
+                                visible: true
+                            });
+
+                            result = await this._parseProjectsList(page);
+                            console.log(`${new Date().toLocaleString()}: Распарсили страницу ${pageCount++}`);
+                            projects.push(result);
+                        }
+                    } catch (e) {
+                        console.log(`${new Date().toLocaleString()}: Больше нет страниц`);
+                    }
 
                     return page.close();
                 }
