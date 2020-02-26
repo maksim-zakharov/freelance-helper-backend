@@ -1,12 +1,9 @@
 import * as puppeteer from "puppeteer";
 import {Browser, Page} from "puppeteer";
 import './puppeteer-extension';
-import {tryNavigate, typeText} from "./puppeteer-extension";
+import {createPage, tryNavigate, typeText} from "./puppeteer-extension";
 
 export class FlService {
-
-    private _freePages: Page[] = [];
-    private _inUsePages: Page[] = [];
 
     constructor() {
     }
@@ -38,11 +35,19 @@ export class FlService {
     login = async (model: { login: string, password: string, rememberMe?: boolean, isDebug?: boolean | string }): Promise<Page> => {
         const browser = await puppeteer.launch({
             headless: model.isDebug != 'true',
-            // args: ['--no-sandbox']
+            args: [
+                '--no-sandbox',
+                '--disable-setuid-sandbox',
+                '--disable-dev-shm-usage',
+                '--disable-accelerated-2d-canvas',
+                '--disable-gpu',
+                '--window-size=1920x1080'
+            ]
         });
 
+        const page = await createPage(browser, true);
+
         // Откроем новую страницу
-        const page = await browser.newPage();
         await tryNavigate(page, 'https://www.fl.ru/login/');
 
         // Вводим логин
@@ -104,13 +109,6 @@ export class FlService {
             throw new Error('Нужно передать параметры для поиска');
         }
 
-        let browser: Browser;
-        if (!search.page) {
-            browser = await puppeteer.launch({headless: search.isDebug != 'true'});
-        } else {
-            browser = search.page.browser();
-        }
-
         try {
             if (!search.words || !search.words.length) {
                 throw new Error('Нужно передать ключевые слова для поиска');
@@ -118,12 +116,27 @@ export class FlService {
 
             console.log(`${new Date().toLocaleString()}: Начало скраббинга`);
 
-            let projects = [];
-
-            await Promise.all(search.words.map(async (word, index) => {
+            let projects = await Promise.all(search.words.map(async (word, index) => {
                     // for (let i = 0; i < search.words.length; i++) {
                     //     const word = search.words[i];
-                    const page = index === 0 && search.page ? search.page : await browser.newPage();
+
+                    let browser: Browser;
+                    if (!search.page) {
+                        browser = await puppeteer.launch({
+                            headless: search.isDebug != 'true',
+                            args: [
+                                '--no-sandbox',
+                                '--disable-setuid-sandbox',
+                                '--disable-dev-shm-usage',
+                                '--disable-accelerated-2d-canvas',
+                                '--disable-gpu',
+                                '--window-size=1920x1080'
+                            ]
+                        });
+                    } else {
+                        browser = search.page.browser();
+                    }
+                    const page = index === 0 && search.page ? search.page : await createPage(browser, true);
 
                     if (search.page) {
                         const cookies = await search.page.cookies();
@@ -149,33 +162,34 @@ export class FlService {
 
                     await page.click('#frm > div.b-layout.b-layout_overflow_hidden > div > button');
                     await page.waitForSelector('#projects-list [id^="project-item"]', {
-                        visible: true
+                        visible: true,
+                        timeout: 1000
                     });
                     console.log(`${new Date().toLocaleString()}: Пытаемся распарсить список`);
 
-
                     let pageCount = 1;
 
-                    let result = await this._parseProjectsList(page);
+                    let filteredProjects = await this._parseProjectsList(page);
                     console.log(`${new Date().toLocaleString()}: Распарсили страницу ${pageCount++}`);
-                    projects.push(result);
 
                     try {
-                        while (await page.waitForSelector('#PrevLink', {timeout: 1000})) {
-                            await page.click('#PrevLink');
+                        while (true) {
+                            await tryNavigate(page, `https://www.fl.ru/projects/?page=${pageCount}&kind=5`);
                             await page.waitForSelector('#projects-list [id^="project-item"]', {
-                                visible: true
+                                visible: true,
+                                timeout: 1000
                             });
 
-                            result = await this._parseProjectsList(page);
+                            const result = await this._parseProjectsList(page);
                             console.log(`${new Date().toLocaleString()}: Распарсили страницу ${pageCount++}`);
-                            projects.push(result);
+                            filteredProjects = [...filteredProjects, ...result];
                         }
                     } catch (e) {
                         console.log(`${new Date().toLocaleString()}: Больше нет страниц`);
                     }
 
-                    return page.close();
+                    // await page.close();
+                    return filteredProjects;
                 }
             ));
             const items = this.distinct<any>(this.selectMany(projects, i => i), i => i.id);
@@ -189,7 +203,7 @@ export class FlService {
                 error: e.message
             }
         } finally {
-            await browser.close();
+            // await browser.close();
         }
     };
 }

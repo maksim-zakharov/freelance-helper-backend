@@ -1,4 +1,4 @@
-import {Page} from "puppeteer";
+import {Browser, Page, ResourceType} from "puppeteer";
 
 /**
  * Набор текста в предварительно очищенную строку
@@ -26,8 +26,76 @@ export const tryNavigate = async (page: Page, pageUrl: string): Promise<void> =>
             return;
         }
 
-        await page.goto(pageUrl, {waitUntil: "domcontentloaded", timeout: 0}); // При domcontentloaded не дожидаемся загрузки фоток и стилей
+        await page.goto(pageUrl, {
+            // waitUntil: "domcontentloaded",
+            // timeout: 10000
+
+            timeout: 25000,
+            waitUntil: 'networkidle2',
+        }); // При domcontentloaded не дожидаемся загрузки фоток и стилей
     } catch (error) {
         console.log(`${new Date().toLocaleString()}: Не удалось открыть страницу: ${pageUrl} из-за ошибки: ${error}`);
     }
+};
+
+export const createPage = async (browser: Browser, withoutAssets?: boolean): Promise<Page> => {
+    const page = await browser.newPage();
+    if (withoutAssets) {
+        const blockedResourceTypes = [
+        'image',
+        'media',
+        'font',
+        'texttrack',
+        'object',
+        'beacon',
+        'csp_report',
+        'imageset',
+    ];
+
+        const skippedResources = [
+            'quantserve',
+            'adzerk',
+            'doubleclick',
+            'adition',
+            'exelator',
+            'sharethrough',
+            'cdn.api.twitter',
+            'google-analytics',
+            'googletagmanager',
+            'google',
+            'fontawesome',
+            'facebook',
+            'analytics',
+            'optimizely',
+            'clicktale',
+            'mixpanel',
+            'zedo',
+            'clicksor',
+            'mc.yandex.ru',
+            '.mail.ru',
+            'tiqcdn',
+        ];
+        try {
+            await page.setRequestInterception(true);
+            page.on('request', request => {
+                const requestUrl = request.url().split('?')[0].split('#')[0];
+                if (
+                    blockedResourceTypes.indexOf(request.resourceType()) !== -1 ||
+                    skippedResources.some(resource => requestUrl.indexOf(resource) !== -1)
+                    // Be careful with above
+                    || request.url().includes('.jpg')
+                    || request.url().includes('.jpeg')
+                    || request.url().includes('.png')
+                    || request.url().includes('.gif')
+                    || request.url().includes('.css')
+                )
+                    request.abort();
+                else
+                    request.continue();
+            });
+        } catch (e) {
+
+        }
+    }
+    return page;
 };
