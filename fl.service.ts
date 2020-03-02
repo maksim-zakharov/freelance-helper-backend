@@ -1,9 +1,13 @@
 import * as puppeteer from "puppeteer";
 import {Browser, Page} from "puppeteer";
 import './puppeteer-extension';
-import {createPage, tryNavigate, typeText} from "./puppeteer-extension";
+import {createBrowser, createPage, isExist, tryNavigate, typeText} from "./puppeteer-extension";
+import {Cookie} from "puppeteer";
 
 export class FlService {
+
+    private _cookies: Cookie[] = [];
+    private _browser: Browser;
 
     constructor() {
     }
@@ -28,48 +32,104 @@ export class FlService {
         return result;
     };
 
-    /**
-     * Авторизовывается на странице и возвращает страницу с кукисами
-     * @param model
-     */
-    login = async (model: { login: string, password: string, rememberMe?: boolean, isDebug?: boolean | string }): Promise<Page> => {
-        const browser = await puppeteer.launch({
-            headless: model.isDebug != 'true',
-            args: [
-                '--no-sandbox',
-                '--disable-setuid-sandbox',
-                '--disable-dev-shm-usage',
-                '--disable-accelerated-2d-canvas',
-                '--disable-gpu',
-                '--window-size=1920x1080'
-            ]
+    loginUpwork = async (options: { login: string, password: string, rememberMe?: boolean, isDebug?: boolean | string }) => {
+
+        const USERNAME_SELECTOR = '#login_username';
+        const CHECK_USERNAME_SELECTOR = '#main-auth-card > form > div.ng-animate-disabled.p-xs-top.auth-growable-flex > div > div > button';
+        const PASSWORD_SELECTOR = '#login_password';
+        const REMEMBER_ME_SELECTOR = '#main-auth-card > form > div:nth-child(4) > div > div > div:nth-child(7) > div.pull-left.d-none-mobile-app > div > label';
+        const SIGN_IN_SELECTOR = '#main-auth-card > form > div:nth-child(4) > div > div > button';
+
+        if (!this._browser) {
+            this._browser = await createBrowser(options.isDebug as boolean);
+        }
+
+        const page = await createPage(this._browser, true);
+
+        // if (this._cookies) {
+        //     await page.setCookie(...this._cookies);
+        //     return;
+        // }
+
+        // Откроем новую страницу
+        await tryNavigate(page, 'https://www.upwork.com/ab/account-security/login');
+
+        // Вводим логин
+        await typeText(page, USERNAME_SELECTOR, options.login);
+        await page.click(CHECK_USERNAME_SELECTOR);
+        await page.waitForSelector('#projects-list', {
+            visible: true
         });
 
-        const page = await createPage(browser, true);
+        // Вводим пароль
+        await typeText(page, PASSWORD_SELECTOR, options.password);
+
+        // Жмем "Запомнить меня"
+        if (options.rememberMe) {
+            await page.click(REMEMBER_ME_SELECTOR);
+        }
+
+        // Жмем "Войти"
+        await page.click(SIGN_IN_SELECTOR);
+        await page.waitForSelector('#feed-jobs > section:nth-child(1) > div > div > div > div.clearfix.ng-scope > h4 > a', {
+            visible: true
+        });
+
+        console.log("ЛОГИН В АПВОРК ЗАВЕРШЕН!");
+    };
+
+    /**
+     * Авторизовывается на странице и возвращает страницу с кукисами
+     * @param options
+     */
+    login = async (options: { login: string, password: string, rememberMe?: boolean, isDebug?: boolean | string }): Promise<Page> => {
+
+        const USERNAME_SELECTOR = '#el-login';
+        const PASSWORD_SELECTOR = '#el-passwd';
+        const REMEMBER_ME_SELECTOR = '#el-autologin';
+        const SIGN_IN_SELECTOR = '#el-singin';
+
+        if (!this._browser) {
+            this._browser = await createBrowser(options.isDebug as boolean);
+        }
+
+        const page = await createPage(this._browser, true);
+
+        if (this._cookies.length) {
+            await page.setCookie(...this._cookies);
+            return;
+        }
 
         // Откроем новую страницу
         await tryNavigate(page, 'https://www.fl.ru/login/');
 
         // Вводим логин
-        await typeText(page, '#el-login', model.login);
+        await typeText(page, USERNAME_SELECTOR, options.login);
 
         // Вводим пароль
-        await typeText(page, '#el-passwd', model.password);
+        await typeText(page, PASSWORD_SELECTOR, options.password);
 
         // Жмем "Запомнить меня"
-        if (model.rememberMe) {
-            await page.click('#el-autologin');
+        if (options.rememberMe) {
+            await page.click(REMEMBER_ME_SELECTOR);
         }
 
         // Жмем "Войти"
-        await page.click('#el-singin');
+        await page.click(SIGN_IN_SELECTOR);
         await page.waitForSelector('#projects-list', {
             visible: true
         });
 
-        return page;
-    }
+        this._cookies = await page.cookies();
 
+        return page;
+    };
+
+    /**
+     * Парсим страницу где есть список проектов
+     * @param page Страница с проектами
+     * @private
+     */
     private _parseProjectsList(page: Page): Promise<any[]> {
         return page.evaluate(() => {
             const projects = Array.from(document.querySelectorAll('#projects-list [id^="project-item"]'));
@@ -83,6 +143,9 @@ export class FlService {
                         ?.textContent
                         .trim()
                     ,
+                    alreadyApplied: document.querySelector(`#project-item${id} > div.b-post__foot.b-post__foot_padtop_15 > div:nth-child(2) > a:nth-child(3)`)
+                        ?.textContent
+                        .trim().includes('ответ'),
                     proposalCount: +document.querySelector(`#project-item${id} > div.b-post__foot.b-post__foot_padtop_15 > div:nth-child(2) > a`)
                         ?.textContent
                         .replace(/[^\x20-\x7E]/g, '')
@@ -100,11 +163,108 @@ export class FlService {
         });
     }
 
+    async sendProposalToProject(projectId: string | number, options?: {
+        isDebug: boolean | string,
+        proposalDescription: string,
+        timeFrom: number,
+        costFrom: number,
+        cookies?: Cookie[]
+    }) {
+
+//         options.proposalDescription = `Привет.
+// Я заинтересовался Вашим предложением и уже готов к работе.
+//
+// Резюме:
+// - Работаю лидером команды в компании Wildberries.ru – лидер рынка онлайн ритейла в России;
+// - В моем распоряжении 6 фронтенд разработчиков;
+// - Более 4 лет разрабатываю CRM и ERP системы;
+// - Более 3 лет использую Ангуляр, Typescript, RXJS;
+// - 2 года работы Fullstack разработчиком с использованием на бэкенде технологий ASP.NET Core, MS  SQL, AWS, Docker, Kubernetes;
+// - Бизнес-ориентирован, умею составлять четкое техническое задание по требованиям заказчика, вести задачи в трекере задач, таких как Jira, Youtrack, Trello.
+//
+// Подробнее обо мне тут:
+// https://www.linkedin.com/in/maksim-zakharov-977179104/
+//
+// Стоимость моей работы от 1277/час.
+//
+// Также могу добавить к работе опытную команду разработчиков уровня Middle +.
+//
+// Если вас заинтересует моя кандидатура, можем обсудить детали сотрудничества здесь, или по следующим контактам:
+//
+// Емайл: max89701@gmail.com
+// Телеграмм: @max89701 (предпочтительно)
+// WhatsApp: +79254306274`;
+
+        if (!options.proposalDescription || options.proposalDescription.length < 5) {
+            throw new Error('Длина описания должна быть не менее 5 символов');
+        }
+
+        if (!options.timeFrom) {
+            throw new Error('Необходимо указать минимальные сроки');
+        }
+
+        if (!options.costFrom) {
+            throw new Error('Необходимо указать минимальную стоимость');
+        }
+
+        // TODO Использовать https://hackernoon.com/tips-and-tricks-for-web-scraping-with-puppeteer-ed391a63d952
+        if (!this._browser) {
+            this._browser = await createBrowser(options.isDebug as boolean);
+        }
+
+        const page = await createPage(this._browser, true);
+
+        if (options && options.cookies) {
+            await page.setCookie(...options.cookies);
+        }
+
+        const TIME_FROM_SELECTOR = '#el-time_from';
+        const CONST_FROM_SELECTOR = '#el-cost_from';
+        const PROPOSAL_DESCRIPTION_SELECTOR = '#el-descr';
+        const SEND_PROPOSAL_SELECTOR = '#quickPaymentPopupOfferOptOnPage > div.b-buttons > button';
+        const REJECT_PROPOSAL_SELECTOR = '#frl_edit_bar > a.b-layout__link.b-layout__link_float_right.b-layout__link_color_ee1d16.b-layout__link_bold';
+        const ALREADY_REJECTED_SELECTOR = 'body > div.b-page__wrapper > div > div.b-layout.b-layout__page > div > div > div.b-layout.b-layout_margright_270.b-layout_marg_null_ipad > div.b-layout.b-layout_2bordbot_dfdfdf0.b-layout_margbot_20 > div.b-layout.b-layout_padleft_60.b-layout_padbot_20.b-layout_pad_null_ipad > div.b-layout > div.po_refused';
+
+        await tryNavigate(page, `https://www.fl.ru/projects/${projectId}`);
+
+        // Если на проект уже откликались
+        if (await isExist(page, REJECT_PROPOSAL_SELECTOR)) {
+            console.log(`На проект ${projectId} уже есть отклик.`);
+            await page.close();
+            return;
+        }
+
+        // Если от проекта уже отказались
+        if (await isExist(page, ALREADY_REJECTED_SELECTOR) || !await isExist(page, PROPOSAL_DESCRIPTION_SELECTOR)) {
+            console.log(`Вы уже отказались от проекта ${projectId}.`);
+            await page.close();
+            return;
+        }
+
+        if (options.proposalDescription) {
+            await typeText(page, PROPOSAL_DESCRIPTION_SELECTOR, options.proposalDescription);
+        }
+
+        if (options.timeFrom) {
+            await typeText(page, TIME_FROM_SELECTOR, options.timeFrom.toString());
+        }
+
+        if (options.costFrom) {
+            await typeText(page, CONST_FROM_SELECTOR, options.costFrom.toString());
+        }
+
+        if (await isExist(page, SEND_PROPOSAL_SELECTOR)) {
+            await page.click(SEND_PROPOSAL_SELECTOR);
+        }
+
+        await page.close();
+    }
+
     /**
      * Возвращает все проекты с сайта https://fl.ru по заданным фильтрам
      * @param search Объект с фильтрами
      */
-    getProjects = async (search: { words: string[], minBudget?: number, isDebug?: boolean | string, maxBudget?: number, withoutContractor?: boolean, page?: Page }) => {
+    getProjects = async (search: { words: string | string[] | any, minBudget?: number, isDebug?: boolean | string, maxBudget?: number, withoutContractor?: boolean, page?: Page, cookies?: Cookie[] }) => {
         if (!search) {
             throw new Error('Нужно передать параметры для поиска');
         }
@@ -114,56 +274,51 @@ export class FlService {
                 throw new Error('Нужно передать ключевые слова для поиска');
             }
 
+            if (typeof search.words === 'string') {
+                search.words = [search.words];
+            }
+
+            const KEYWORDS_SELECTOR = '#pf_keywords';
+            const COST_FROM_SELECTOR = '#pf_cost_from';
+            const COST_TO_SELECTOR = '#pf_cost_to';
+            const HIDE_EXECUTOR_SELECTOR = '#for-hide_exec';
+            const SUBMIT_FILTER_BUTTON_SELECTOR = '#frm > div.b-layout.b-layout_overflow_hidden > div > button';
+            const NOT_FOUND_SELECTOR = 'body > div.b-page__wrapper > div > div.b-layout.b-layout__page > div > div > table > tbody > tr > td.b-layout__td.b-layout__td_padleft_50.b-layout__td_bordleft_c3.b-layout__td_valign_mid.b-layout__td_pad_null_ipad.b-layout__td_bord_null_ipad > div.b-buttons > a';
+
             console.log(`${new Date().toLocaleString()}: Начало скраббинга`);
 
-            let projects = await Promise.all(search.words.map(async (word, index) => {
-                    // for (let i = 0; i < search.words.length; i++) {
-                    //     const word = search.words[i];
+            // TODO Использовать https://hackernoon.com/tips-and-tricks-for-web-scraping-with-puppeteer-ed391a63d952
+            if (!this._browser) {
+                this._browser = await createBrowser(search.isDebug as boolean);
+            }
 
-                    let browser: Browser;
-                    if (!search.page) {
-                        browser = await puppeteer.launch({
-                            headless: search.isDebug != 'true',
-                            args: [
-                                '--no-sandbox',
-                                '--disable-setuid-sandbox',
-                                '--disable-dev-shm-usage',
-                                '--disable-accelerated-2d-canvas',
-                                '--disable-gpu',
-                                '--window-size=1920x1080'
-                            ]
-                        });
-                    } else {
-                        browser = search.page.browser();
-                    }
-                    const page = index === 0 && search.page ? search.page : await createPage(browser, true);
+            let projects = await Promise.all(search.words.map(async (word) => {
+                    const page = await createPage(this._browser, true);
 
-                    if (search.page) {
-                        const cookies = await search.page.cookies();
-                        await page.setCookie(...cookies);
+                    if (search.cookies) {
+                        await page.setCookie(...search.cookies);
                     }
 
                     await tryNavigate(page, 'https://www.fl.ru/projects/');
-                    console.log(`${new Date().toLocaleString()}: Меняем фильтрацию на Angular`);
+                    console.log(`${new Date().toLocaleString()}: Меняем фильтрацию на ${word}`);
 
-                    await typeText(page, '#pf_keywords', word);
+                    await typeText(page, KEYWORDS_SELECTOR, word);
 
                     if (search.minBudget) {
-                        await typeText(page, '#pf_cost_from', search.minBudget.toString());
+                        await typeText(page, COST_FROM_SELECTOR, search.minBudget.toString());
                     }
 
                     if (search.maxBudget) {
-                        await typeText(page, '#pf_cost_to', search.maxBudget.toString());
+                        await typeText(page, COST_TO_SELECTOR, search.maxBudget.toString());
                     }
 
                     if (search.withoutContractor) {
-                        await page.click('#for-hide_exec');
+                        await page.click(HIDE_EXECUTOR_SELECTOR);
                     }
 
-                    await page.click('#frm > div.b-layout.b-layout_overflow_hidden > div > button');
+                    await page.click(SUBMIT_FILTER_BUTTON_SELECTOR);
                     await page.waitForSelector('#projects-list [id^="project-item"]', {
-                        visible: true,
-                        timeout: 1000
+                        visible: true
                     });
                     console.log(`${new Date().toLocaleString()}: Пытаемся распарсить список`);
 
@@ -173,11 +328,18 @@ export class FlService {
                     console.log(`${new Date().toLocaleString()}: Распарсили страницу ${pageCount++}`);
 
                     try {
+                        // Выход из цикла осуществляется прокидыванием ошибки waitForSelector
                         while (true) {
-                            await tryNavigate(page, `https://www.fl.ru/projects/?page=${pageCount}&kind=5`);
+                            await tryNavigate(page, `https://www.fl.ru/projects/?page=${pageCount}&kind=5`, false);
+
+                            if (await isExist(page, NOT_FOUND_SELECTOR)) {
+                                console.log(`${new Date().toLocaleString()}: Больше нет страниц`);
+                                await page.close();
+                                break;
+                            }
+
                             await page.waitForSelector('#projects-list [id^="project-item"]', {
-                                visible: true,
-                                timeout: 1000
+                                visible: true
                             });
 
                             const result = await this._parseProjectsList(page);
@@ -186,9 +348,9 @@ export class FlService {
                         }
                     } catch (e) {
                         console.log(`${new Date().toLocaleString()}: Больше нет страниц`);
+                        await page.close();
                     }
 
-                    // await page.close();
                     return filteredProjects;
                 }
             ));
@@ -203,7 +365,6 @@ export class FlService {
                 error: e.message
             }
         } finally {
-            // await browser.close();
         }
     };
 }
