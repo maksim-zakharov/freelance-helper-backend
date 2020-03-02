@@ -7,7 +7,8 @@ jest.setTimeout(300000);
 test('Получить список проектов без авторизации по Ангуляру', async () => {
     const service = new FlService();
 
-    const projects = await service.getProjects({words: ['angular']
+    const projects = await service.getProjects({
+        words: ['angular']
         // , isDebug: true
     });
 
@@ -133,4 +134,20 @@ test('При отклике на проект отдать ошибку о то�
         costFrom: 1000,
         timeFrom: 1
     })).rejects.toEqual(new Error(`Вы уже отказались от проекта ${projectId}.`));
+});
+
+test('При отклике на проект отдать ошибку о короткой длине описания', async () => {
+    const service = new FlService();
+    const projectId = 4310754;
+    const fileData = fs.readFileSync('cookies.json');
+    const cookies = JSON.parse(fileData.toString()) as Cookie[];
+
+    const details = await service.getProjectDetailsById(projectId, {
+        cookies: cookies,
+        isDebug: true
+    });
+
+    console.log(details);
+
+    // await expect().rejects.toEqual(new Error(`Длина описания должна быть не менее 5 символов`));
 });
