@@ -1,4 +1,5 @@
-import {Browser, Page, default as puppeteer} from "puppeteer";
+import {Browser, Page} from "puppeteer";
+import * as puppeteer from "puppeteer";
 import {default as axios} from 'axios';
 import * as cheerio from 'cheerio';
 

@@ -3,6 +3,7 @@ import {Browser, Page} from "puppeteer";
 import './puppeteer-extension';
 import {createBrowser, createPage, isExist, tryNavigate, typeText} from "./puppeteer-extension";
 import {Cookie} from "puppeteer";
+import {FlProjectModel} from "./fl-project-model";
 
 export class FlService {
 
@@ -130,7 +131,7 @@ export class FlService {
      * @param page Страница с проектами
      * @private
      */
-    private _parseProjectsList(page: Page): Promise<any[]> {
+    private _parseProjectsList(page: Page): Promise<FlProjectModel[]> {
         return page.evaluate(() => {
             const projects = Array.from(document.querySelectorAll('#projects-list [id^="project-item"]'));
             const ids = projects.map((e: HTMLElement) => +e.id.replace('project-item', ''));
@@ -159,16 +160,16 @@ export class FlService {
                         ?.textContent
                         .replace(/[^\x20-\x7E]/g, '')
                         .trim(),
-                }));
+                }) as FlProjectModel);
         });
     }
 
     async sendProposalToProject(projectId: string | number, options?: {
-        isDebug: boolean | string,
+        isDebug?: boolean | string,
         proposalDescription: string,
         timeFrom: number,
         costFrom: number,
-        cookies?: Cookie[]
+        cookies: Cookie[]
     }) {
 
 //         options.proposalDescription = `Привет.
@@ -224,21 +225,32 @@ export class FlService {
         const SEND_PROPOSAL_SELECTOR = '#quickPaymentPopupOfferOptOnPage > div.b-buttons > button';
         const REJECT_PROPOSAL_SELECTOR = '#frl_edit_bar > a.b-layout__link.b-layout__link_float_right.b-layout__link_color_ee1d16.b-layout__link_bold';
         const ALREADY_REJECTED_SELECTOR = 'body > div.b-page__wrapper > div > div.b-layout.b-layout__page > div > div > div.b-layout.b-layout_margright_270.b-layout_marg_null_ipad > div.b-layout.b-layout_2bordbot_dfdfdf0.b-layout_margbot_20 > div.b-layout.b-layout_padleft_60.b-layout_padbot_20.b-layout_pad_null_ipad > div.b-layout > div.po_refused';
+        const ALREADY_HAVE_EXECUTOR_SELECTOR = `#project_status_${projectId}`;
 
         await tryNavigate(page, `https://www.fl.ru/projects/${projectId}`);
 
         // Если на проект уже откликались
         if (await isExist(page, REJECT_PROPOSAL_SELECTOR)) {
-            console.log(`На проект ${projectId} уже есть отклик.`);
-            await page.close();
-            return;
+            throw new Error(`На проект ${projectId} уже есть отклик.`);
+            // console.log(`На проект ${projectId} уже есть отклик.`);
+            // await page.close();
+            // return;
+        }
+
+        // Если на проект уже откликались
+        if (await isExist(page, ALREADY_HAVE_EXECUTOR_SELECTOR)) {
+            throw new Error(`На проект ${projectId} уже выбран исполнитель.`);
+            // console.log(`На проект ${projectId} уже выбран исполнитель.`);
+            // await page.close();
+            // return;
         }
 
         // Если от проекта уже отказались
         if (await isExist(page, ALREADY_REJECTED_SELECTOR) || !await isExist(page, PROPOSAL_DESCRIPTION_SELECTOR)) {
-            console.log(`Вы уже отказались от проекта ${projectId}.`);
-            await page.close();
-            return;
+            throw new Error(`Вы уже отказались от проекта ${projectId}.`);
+            // console.log(`Вы уже отказались от проекта ${projectId}.`);
+            // await page.close();
+            // return;
         }
 
         if (options.proposalDescription) {
@@ -264,12 +276,13 @@ export class FlService {
      * Возвращает все проекты с сайта https://fl.ru по заданным фильтрам
      * @param search Объект с фильтрами
      */
-    getProjects = async (search: { words: string | string[] | any, minBudget?: number, isDebug?: boolean | string, maxBudget?: number, withoutContractor?: boolean, page?: Page, cookies?: Cookie[] }) => {
-        if (!search) {
-            throw new Error('Нужно передать параметры для поиска');
-        }
+    getProjects = async (search: { words: string | string[] | any, minBudget?: number, isDebug?: boolean | string, maxBudget?: number, withoutContractor?: boolean, cookies?: Cookie[] }): Promise<{ items?: FlProjectModel[], length?: number, error?: string }> => {
 
         try {
+            if (!search) {
+                throw new Error('Нужно передать параметры для поиска');
+            }
+
             if (!search.words || !search.words.length) {
                 throw new Error('Нужно передать ключевые слова для поиска');
             }
