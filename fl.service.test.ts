@@ -136,7 +136,7 @@ test('При отклике на проект отдать ошибку о то�
     })).rejects.toEqual(new Error(`Вы уже отказались от проекта ${projectId}.`));
 });
 
-test('При отклике на проект отдать ошибку о короткой длине описания', async () => {
+test('Получить список сообщений по проекту', async () => {
     const service = new FlService();
     const projectId = 4310754;
     const fileData = fs.readFileSync('cookies.json');
@@ -147,7 +147,6 @@ test('При отклике на проект отдать ошибку о ко�
         isDebug: true
     });
 
-    console.log(details);
-
-    // await expect().rejects.toEqual(new Error(`Длина описания должна быть не менее 5 символов`));
-});
+    expect(details).toBeDefined();
+    expect(details.messages.length).toBeGreaterThan(0);
+  });

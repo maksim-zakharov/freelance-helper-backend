@@ -186,24 +186,29 @@ export class FlService {
         // Откроем новую страницу
         await tryNavigate(page, `https://www.fl.ru/projects/${projectId}/`);
 
-        await page.click('[id^="toggle_dialogue_"]');
+        // Если на проекте уже откликались
+        if (await isExist(page, '[id^="po_dialogue_talk_"]')) {
+            await page.click('[id^="toggle_dialogue_"]');
 
-        await page.waitForSelector('[id^="po_dialogue_talk_"]', {
-            visible: true
-        });
+            await page.waitForSelector('[id^="po_dialogue_talk_"]', {
+                visible: true
+            });
+        }
 
         return page.evaluate(() => {
             const dialogueTalk = document.querySelector(`[id^="po_dialogue_talk_"]`);
             const messages = dialogueTalk.querySelectorAll(`#po_dialogue_talk_60990309 > div`);
 
-            return Array.from(messages).map(message => ({
-                user: {
-                    url: message.querySelector(`span:first-child > a`)?.getAttribute('href') ? `https://www.fl.ru${message.querySelector(`span:first-child > a`)?.getAttribute('href')}` : undefined,
-                    name: message.querySelector(`span:first-child > a`)?.textContent ? message.querySelector(`span:first-child > a`)?.textContent : message.querySelector(`span:first-child`)?.textContent
-                },
-                createDate: message.querySelector(`[id^="po_date_"]`)?.textContent,
-                text: message.querySelector(`[id^="po_comment_"]`)?.textContent?.replace('<br>', '\n').trimLeft()
-            }));
+            return {
+                messages: Array.from(messages).map(message => ({
+                    user: {
+                        url: message.querySelector(`span:first-child > a`)?.getAttribute('href') ? `https://www.fl.ru${message.querySelector(`span:first-child > a`)?.getAttribute('href')}` : undefined,
+                        name: message.querySelector(`span:first-child > a`)?.textContent ? message.querySelector(`span:first-child > a`)?.textContent : message.querySelector(`span:first-child`)?.textContent
+                    },
+                    createDate: message.querySelector(`[id^="po_date_"]`)?.textContent,
+                    text: message.querySelector(`[id^="po_comment_"]`)?.textContent?.replace('<br>', '\n').trimLeft()
+                }))
+            };
         });
     }
 
