@@ -21,7 +21,7 @@
     "axios": "^0.19.2",
     "cheerio": "^1.0.0-rc.3",
     "compression": "^1.7.4",
-    "express": "^4.17.1",
+    "express": "^4.17.3",
     "form-data": "^3.0.0",
     "jest": "^25.1.0",
     "jest-puppeteer": "^4.4.0",
