@@ -1,0 +1,101 @@
+[
+  {
+    "name": "new_pf10",
+    "value": "1",
+    "domain": "www.fl.ru",
+    "path": "/",
+    "expires": 1585595361.524734,
+    "size": 9,
+    "httpOnly": false,
+    "secure": false,
+    "session": false
+  },
+  {
+    "name": "new_pf0",
+    "value": "1",
+    "domain": "www.fl.ru",
+    "path": "/",
+    "expires": 1585595361.524693,
+    "size": 8,
+    "httpOnly": false,
+    "secure": false,
+    "session": false
+  },
+  {
+    "name": "ue_sso_token",
+    "value": "Co%252F%252F5cs43fxuiFrYfQ1HftiB%252FexNb8YiWpQ3q1BftODn3tfQlLro%252BVqPviJVxHFG%252BguMqZH0e7JuVCUNA%252Bw5cem3HueDcgxzSVilNeMd5AH6V5H7L734BhEdxFAhtWj1AdEyxVjt6Lh3gY%252BpiLWZDQFpYubbAseLzbUPlXiywczII7ycIRvgh%252Bd7iDCUQQ1dj42AmBXpwEaj2zEq9WyPcw%253D%253D",
+    "domain": ".fl.ru",
+    "path": "/",
+    "expires": -1,
+    "size": 268,
+    "httpOnly": false,
+    "secure": false,
+    "session": true
+  },
+  {
+    "name": "hidetopprjlenta",
+    "value": "0",
+    "domain": "www.fl.ru",
+    "path": "/",
+    "expires": 1585595361.524746,
+    "size": 16,
+    "httpOnly": false,
+    "secure": false,
+    "session": false
+  },
+  {
+    "name": "uechat_3_disabled",
+    "value": "true",
+    "domain": "www.fl.ru",
+    "path": "/",
+    "expires": 1583003956,
+    "size": 21,
+    "httpOnly": false,
+    "secure": false,
+    "session": false
+  },
+  {
+    "name": "uechat_3_first_time",
+    "value": "1583003355889",
+    "domain": "www.fl.ru",
+    "path": "/",
+    "expires": 1583006955,
+    "size": 32,
+    "httpOnly": false,
+    "secure": false,
+    "session": false
+  },
+  {
+    "name": "uechat_3_pages_count",
+    "value": "1",
+    "domain": "www.fl.ru",
+    "path": "/",
+    "expires": 1583006955,
+    "size": 21,
+    "httpOnly": false,
+    "secure": false,
+    "session": false
+  },
+  {
+    "name": "uechat_3_mode",
+    "value": "0",
+    "domain": "www.fl.ru",
+    "path": "/",
+    "expires": 1583003421,
+    "size": 14,
+    "httpOnly": false,
+    "secure": false,
+    "session": false
+  },
+  {
+    "name": "PHPSESSID",
+    "value": "950b2183a2943c82fc417368b5485ab6",
+    "domain": ".www.fl.ru",
+    "path": "/",
+    "expires": -1,
+    "size": 41,
+    "httpOnly": true,
+    "secure": false,
+    "session": true
+  }
+]

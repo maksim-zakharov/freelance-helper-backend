@@ -1,0 +1,43 @@
+service: puppeteer-crawlers
+name: yandex-cloud-template
+frameworkVersion: ">=1.1.0 <2.0.0"
+
+provider:
+  name: yandex-cloud
+  runtime: nodejs12-preview
+
+plugins:
+  - serverless-yandex-cloud
+
+package:
+#  exclude:
+#    - ./**
+#    - node_modules/puppeteer/.local-chromium/**
+  include:
+    - ./node_modules/puppeteer/**
+    - ./serverless/**
+#    - ./serverless/*.js
+
+functions:
+  get-vacancies:
+    handler: headhunter.getVacancies
+    memory: 128
+    timeout: 3
+
+#  timer:
+#    handler: index.hello
+#    memory: 128
+#    timeout: 5
+#    events:
+#      - cron:
+#          expression: "* * * * ? *"
+#          account: trigger-sa
+#          retry:
+#            attempts: 1
+#            interval: 10
+
+resources:
+  trigger-sa:
+    type: yc::ServiceAccount
+    roles:
+      - serverless.functions.invoker

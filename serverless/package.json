@@ -1,0 +1,7 @@
+{
+  "name": "puppeteer-crawlers",
+  "version": "1.0.0",
+  "dependencies": {
+    "puppeteer": "^2.1.0"
+  }
+}

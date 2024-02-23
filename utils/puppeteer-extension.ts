@@ -43,7 +43,7 @@ export const isExist = async (page: Page, selector: string, timeout?: number): P
 export const tryNavigate = async (page: Page, pageUrl: string, isDynamic: boolean = true): Promise<void> => {
     try {
         // Попробуем перейти по URL
-        console.log(`${new Date().toLocaleString()}: Открываю страницу: ${pageUrl}`);
+        // console.log(`${new Date().toLocaleString()}: Открываю страницу: ${pageUrl}`);
 
         if (page.url() === pageUrl) {
             return;
@@ -51,8 +51,8 @@ export const tryNavigate = async (page: Page, pageUrl: string, isDynamic: boolea
 
         // if (isDynamic) {
         await Promise.all([
-            page.goto(pageUrl, {waitUntil: "networkidle2",})
-            , page.waitForNavigation({waitUntil: 'networkidle2'})
+            page.goto(pageUrl, {waitUntil: "domcontentloaded",})
+            , page.waitForNavigation({waitUntil: 'domcontentloaded'})
         ]);
         // } else {
         //     const cookies = await page.cookies();
@@ -68,26 +68,32 @@ export const tryNavigate = async (page: Page, pageUrl: string, isDynamic: boolea
 
     } catch (error) {
         console.log(`${new Date().toLocaleString()}: Не удалось открыть страницу: ${pageUrl} из-за ошибки: ${error}`);
-        await page.close();
+        // await page.close();
     }
 };
 
 export const createBrowser = (isDebug?: boolean): Promise<Browser> => {
     return puppeteer.launch({
-        headless: !isDebug, //options.isDebug != 'true',
+        headless: !isDebug,
         args: [
+            "--enable-features=NetworkService",
             '--no-sandbox',
             '--disable-setuid-sandbox',
             '--disable-dev-shm-usage',
             '--disable-accelerated-2d-canvas',
             '--disable-gpu',
             '--window-size=1920x1080'
-        ]
+        ],
+        ignoreHTTPSErrors: true
     });
 };
 
 export const createPage = async (browser: Browser, withoutAssets?: boolean): Promise<Page> => {
     const page = await browser.newPage();
+    await page.setViewport({
+        width: 1920,
+        height: 1080,
+    })
     if (withoutAssets) {
         const blockedResourceTypes = [
             'image',
@@ -122,6 +128,12 @@ export const createPage = async (browser: Browser, withoutAssets?: boolean): Pro
             'mc.yandex.ru',
             '.mail.ru',
             'tiqcdn',
+          'https://www.upwork.com/upi/psmetrics',
+          '.px-cloud.net',
+          'https://bcdn-logs.upwork.com',
+          'https://p.tvpixel.com',
+          'www.googletagmanager.com',
+          'www.redditstatic.com'
         ];
         try {
             await page.setRequestInterception(true);
